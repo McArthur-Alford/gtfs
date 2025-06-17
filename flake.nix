@@ -46,6 +46,7 @@
             rust-script
             pkg-config
             openssl
+            protobuf_29
           ];
         };
       }

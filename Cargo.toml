@@ -5,10 +5,16 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+chrono = "0.4.41"
 gtfs-structures = "0.43.0"
+prost = "0.13.5"
+prost-types = "0.13.5"
 reqwest = { version = "0.12.20", features = ["json"] }
 serde = "1.0.219"
 serde-protobuf = "0.8.2"
 tokio = { version = "1.45.1", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[build-dependencies]
+prost-build = "0.13.5"
