@@ -1,2 +1,5 @@
 target/
 .direnv/
+SEQ_GTFS.zip
+sample-feed.zip
+gtfs.zip

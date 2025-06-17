@@ -45,6 +45,7 @@
             cargo-flamegraph
             rust-script
             pkg-config
+            openssl
           ];
         };
       }
