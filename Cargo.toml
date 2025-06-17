@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-gtfs-structures = { version = "0.43.0", features = ["read-url"] }
+gtfs-structures = "0.43.0"
 reqwest = { version = "0.12.20", features = ["json"] }
 serde = "1.0.219"
 serde-protobuf = "0.8.2"

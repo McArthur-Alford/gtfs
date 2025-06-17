@@ -1,4 +1,5 @@
 use anyhow::Result;
+use gtfs_structures::Gtfs;
 use tracing::{debug, info};
 use tracing_subscriber::{EnvFilter, field::MakeExt};
 
@@ -10,7 +11,7 @@ fn main() -> Result<()> {
 
     info!("Starting");
 
-    let gtfs = gtfs_structures::Gtfs::new("./SEQ_GTFS.zip")?;
+    let gtfs = Gtfs::new("./SEQ_GTFS.zip")?;
 
     debug!(stops=?gtfs.stops);
 
