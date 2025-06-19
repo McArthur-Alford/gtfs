@@ -2,3 +2,14 @@ services:
   app:
     image: gtfs
     build: ./
+    environment:
+      DATABASE_URL: postgresql://admin:admin@db:5432/gtfs_db
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: gtfs_db
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    

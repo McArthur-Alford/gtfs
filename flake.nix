@@ -36,6 +36,7 @@
       {
         devShells.default = craneLib.devShell {
           RUST_SRC_PATH = "${rust}/lib/rustlib/src/rust/library";
+          DATABASE_URL = "postgresql://admin:admin@localhost:5432/gtfs_db";
 
           packages = with pkgs; [
             rustfmt
@@ -47,6 +48,7 @@
             pkg-config
             openssl
             protobuf_29
+            sqlx-cli
           ];
         };
       }

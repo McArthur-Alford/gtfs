@@ -19,12 +19,28 @@ async fn main() -> Result<()> {
 
     info!("Starting");
 
+    let gtfs = load_gtfs("./seq_gtfs.zip".to_owned()).await.unwrap();
+
+    // TODO:
+    // Pull out a db module and connect with sqlx.
+    // Save the Gtfs struct above into it (skipping things that already exist).
+    //
+    // Then switch over to a periodic task that pulls from the translink url.
+
+    gtfs.print_stats();
+    return Ok(());
+
     loop {
         if let Err(e) = poll().await {
             error!(e=?e);
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+}
+
+async fn load_gtfs(url: String) -> Result<gtfs_structures::Gtfs> {
+    let gtfs = gtfs_structures::Gtfs::new(&url)?;
+    Ok(gtfs)
 }
 
 async fn poll() -> Result<()> {
