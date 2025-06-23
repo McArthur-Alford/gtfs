@@ -50,6 +50,7 @@
             openssl
             protobuf_29
             sqlx-cli
+            postgresql_17
           ];
         };
       }

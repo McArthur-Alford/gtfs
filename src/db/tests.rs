@@ -10,7 +10,7 @@ use super::queries::{
 };
 use super::types::*;
 use chrono::TimeDelta;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use tracing_test::traced_test;
 
 #[traced_test]

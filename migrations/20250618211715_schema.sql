@@ -105,13 +105,3 @@ CREATE TABLE feed_info
   feed_start_date        integer NULL,
   feed_end_date          integer NULL
 );
-
--- \COPY agency FROM './seq_gtfs/agency.txt' (FORMAT CSV, HEADER)
--- \COPY stops FROM './seq_gtfs/stops.txt' (FORMAT CSV, HEADER)
--- \COPY routes FROM './seq_gtfs/routes.txt' (FORMAT CSV, HEADER)
--- \COPY trips FROM './seq_gtfs/trips.txt' (FORMAT CSV, HEADER)
--- \COPY stop_times FROM './seq_gtfs/stop_times.txt' (FORMAT CSV, HEADER)
--- \COPY calendar FROM './seq_gtfs/calendar.txt' (FORMAT CSV, HEADER)
--- \COPY calendar_dates FROM './seq_gtfs/calendar_dates.txt' (FORMAT CSV, HEADER)
--- \COPY shapes FROM './seq_gtfs/shapes.txt' (FORMAT CSV, HEADER)
--- \COPY feed_info FROM './seq_gtfs/feed_info.txt' (FORMAT CSV, HEADER)
