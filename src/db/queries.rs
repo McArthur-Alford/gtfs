@@ -1,3 +1,8 @@
+//! DB Queries
+//!
+//! A whole bunch of internal queries for the db.
+//! All the SQL should be in here.
+
 use super::types::*;
 use chrono::TimeDelta;
 use sqlx::PgPool;

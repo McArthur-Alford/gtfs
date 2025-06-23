@@ -1,14 +1,24 @@
+//! DB
+//!
+//! DB module exposes the Db struct,
+//! which abstracts away all the dirty Db operations.
+
 pub mod queries;
+mod tests;
 pub mod types;
 
 use crate::vars;
 use anyhow::Result;
-use sqlx::{PgPool, migrate};
+use sqlx::PgPool;
 use tracing::{info, instrument};
 
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+
+/// Db struct wraps the Db and provides a wonderful interface.
 #[derive(Debug)]
 pub struct Db(pub PgPool);
 
+/// Attempt to connect to the database, using DATABASE_URL.
 #[instrument]
 pub async fn connect() -> Result<Db> {
     info!("Attempting to connect to db");
@@ -19,10 +29,11 @@ pub async fn connect() -> Result<Db> {
 }
 
 impl Db {
+    /// Run the migrations on the database, using MIGRATOR
     #[instrument(name = "db_migrations", skip(self))]
     pub async fn run_migrations(&mut self) -> Result<()> {
         info!("Attempting DB migrations");
-        sqlx::migrate!("./migrations").run(&self.0).await?;
+        MIGRATOR.run(&self.0).await?;
         info!("Db migrations complete");
         Ok(())
     }

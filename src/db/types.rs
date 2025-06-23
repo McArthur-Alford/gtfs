@@ -1,5 +1,11 @@
+//! DB Types
+//!
+//! Types for database operations.
+//! Should directly map to the schema tables.
+
 use sqlx::FromRow;
 
+/// Representation of agency table rows
 #[derive(Debug, FromRow)]
 pub struct Agency {
     pub agency_name: String,
@@ -9,6 +15,7 @@ pub struct Agency {
     pub agency_phone: Option<String>,
 }
 
+/// Representation of stops table rows
 #[derive(Debug, FromRow)]
 pub struct Stop {
     pub stop_id: String,
@@ -24,6 +31,7 @@ pub struct Stop {
     pub platform_code: Option<String>,
 }
 
+/// Representation of routes table rows
 #[derive(Debug, FromRow)]
 pub struct Route {
     pub route_id: String,
@@ -36,6 +44,7 @@ pub struct Route {
     pub route_text_color: Option<String>,
 }
 
+/// Representation of trips table rows
 #[derive(Debug, FromRow)]
 pub struct Trip {
     pub route_id: String,
@@ -47,6 +56,7 @@ pub struct Trip {
     pub shape_id: Option<String>,
 }
 
+/// Representation of stop_times table rows
 #[derive(Debug, FromRow)]
 pub struct StopTime {
     pub trip_id: String,
@@ -58,6 +68,7 @@ pub struct StopTime {
     pub drop_off_type: i32,
 }
 
+/// Representation of calendar table rows
 #[derive(Debug, FromRow)]
 pub struct Calendar {
     pub service_id: String,
@@ -72,6 +83,7 @@ pub struct Calendar {
     pub end_date: i64,
 }
 
+/// Representation of calendar_date table rows
 #[derive(Debug, FromRow)]
 pub struct CalendarDate {
     pub service_id: String,
@@ -79,6 +91,7 @@ pub struct CalendarDate {
     pub exception_type: i32,
 }
 
+/// Representation of shapes table rows
 #[derive(Debug, FromRow)]
 pub struct Shape {
     pub shape_id: String,
@@ -87,6 +100,7 @@ pub struct Shape {
     pub shape_pt_sequence: i32,
 }
 
+/// Representation of feed_info table rows
 #[derive(Debug, FromRow)]
 pub struct FeedInfo {
     pub feed_publisher_name: String,
