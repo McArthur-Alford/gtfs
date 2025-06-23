@@ -1,4 +1,5 @@
 pub mod db;
+pub mod vars;
 
 use anyhow::Result;
 use prost::Message;

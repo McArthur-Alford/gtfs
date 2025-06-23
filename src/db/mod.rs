@@ -1,10 +1,22 @@
-use sqlx::PgPool;
-use std::env;
+use crate::vars;
+use anyhow::Result;
+use sqlx::{PgPool, migrate};
+use tracing::instrument;
 
-pub struct Db(PgPool);
+#[derive(Debug)]
+pub struct Db(pub PgPool);
 
-pub async fn init_pool() -> Result<PgPool, sqlx::Error> {
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    // PgPool:: .max_connections(5).connect(&db_url).await
-    todo!()
+#[instrument]
+pub async fn connect() -> Result<Db> {
+    let db_url = vars::db_url();
+    let pool = PgPool::connect(&db_url).await?;
+    Ok(Db(pool))
+}
+
+impl Db {
+    #[instrument(name = "db_migrations", skip(self))]
+    pub async fn run_migrations(&mut self) -> Result<()> {
+        sqlx::migrate!("./migrations").run(&self.0).await?;
+        Ok(())
+    }
 }
