@@ -75,15 +75,15 @@ CREATE TABLE calendar
   friday                 boolean NOT NULL,
   saturday               boolean NOT NULL,
   sunday                 boolean NOT NULL,
-  start_date             numeric(8) NOT NULL,
-  end_date               numeric(8) NOT NULL
+  start_date             integer NOT NULL,
+  end_date               integer NOT NULL
 );
 
 DROP TABLE IF EXISTS calendar_dates CASCADE;
 CREATE TABLE calendar_dates
 (
   service_id             text NOT NULL,
-  date                   numeric(8) NOT NULL,
+  date                   integer NOT NULL,
   exception_type         integer NOT NULL CHECK (exception_type >= 1 AND exception_type <= 2)
 );
 
@@ -102,8 +102,8 @@ CREATE TABLE feed_info
   feed_publisher_name    text NOT NULL,
   feed_publisher_url     text NOT NULL,
   feed_lang              text NULL,
-  feed_start_date        numeric(8) NULL,
-  feed_end_date          numeric(8) NULL
+  feed_start_date        integer NULL,
+  feed_end_date          integer NULL
 );
 
 -- \COPY agency FROM './seq_gtfs/agency.txt' (FORMAT CSV, HEADER)

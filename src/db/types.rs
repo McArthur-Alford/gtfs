@@ -3,10 +3,10 @@
 //! Types for database operations.
 //! Should directly map to the schema tables.
 
-use sqlx::FromRow;
+use sqlx::{FromRow, postgres::types::PgInterval};
 
 /// Representation of agency table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct Agency {
     pub agency_name: String,
     pub agency_url: String,
@@ -16,7 +16,7 @@ pub struct Agency {
 }
 
 /// Representation of stops table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq)]
 pub struct Stop {
     pub stop_id: String,
     pub stop_code: Option<String>,
@@ -32,7 +32,7 @@ pub struct Stop {
 }
 
 /// Representation of routes table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct Route {
     pub route_id: String,
     pub route_short_name: Option<String>,
@@ -45,7 +45,7 @@ pub struct Route {
 }
 
 /// Representation of trips table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct Trip {
     pub route_id: String,
     pub service_id: String,
@@ -57,11 +57,11 @@ pub struct Trip {
 }
 
 /// Representation of stop_times table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct StopTime {
     pub trip_id: String,
-    pub arrival_time: Option<chrono::Duration>,
-    pub departure_time: chrono::Duration,
+    pub arrival_time: Option<PgInterval>,
+    pub departure_time: PgInterval,
     pub stop_id: String,
     pub stop_sequence: i32,
     pub pickup_type: i32,
@@ -69,7 +69,7 @@ pub struct StopTime {
 }
 
 /// Representation of calendar table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct Calendar {
     pub service_id: String,
     pub monday: bool,
@@ -84,7 +84,7 @@ pub struct Calendar {
 }
 
 /// Representation of calendar_date table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct CalendarDate {
     pub service_id: String,
     pub date: i64,
@@ -92,7 +92,7 @@ pub struct CalendarDate {
 }
 
 /// Representation of shapes table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq)]
 pub struct Shape {
     pub shape_id: String,
     pub shape_pt_lat: f64,
@@ -101,11 +101,11 @@ pub struct Shape {
 }
 
 /// Representation of feed_info table rows
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct FeedInfo {
     pub feed_publisher_name: String,
     pub feed_publisher_url: String,
     pub feed_lang: Option<String>,
-    pub feed_start_date: Option<i64>,
-    pub feed_end_date: Option<i64>,
+    pub feed_start_date: Option<i32>,
+    pub feed_end_date: Option<i32>,
 }

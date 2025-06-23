@@ -105,8 +105,8 @@ pub async fn insert_stop_time(stop_time: &StopTime, pool: &PgPool) -> Result<(),
         VALUES ($1,$2,$3,$4,$5,$6,$7)
         "#,
         stop_time.trip_id,
-        stop_time.arrival_time as Option<TimeDelta>,
-        stop_time.departure_time as TimeDelta,
+        stop_time.arrival_time,
+        stop_time.departure_time,
         stop_time.stop_id,
         stop_time.stop_sequence,
         stop_time.pickup_type,
@@ -189,8 +189,8 @@ pub async fn insert_feed_info(feed: &FeedInfo, pool: &PgPool) -> Result<(), sqlx
         feed.feed_publisher_name,
         feed.feed_publisher_url,
         feed.feed_lang,
-        feed.feed_start_date as Option<i64>,
-        feed.feed_end_date as Option<i64>
+        feed.feed_start_date,
+        feed.feed_end_date
     )
     .execute(pool)
     .await?;
