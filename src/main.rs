@@ -7,6 +7,8 @@ use std::time::Duration;
 use tracing::{debug, error, info};
 use tracing_subscriber::{EnvFilter, field::MakeExt};
 
+use crate::db::connect;
+
 pub mod transit_realtime {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
 }
@@ -20,15 +22,14 @@ async fn main() -> Result<()> {
 
     info!("Starting");
 
-    let gtfs = load_gtfs("./seq_gtfs.zip".to_owned()).await.unwrap();
+    // let gtfs = load_gtfs("./seq_gtfs.zip".to_owned()).await.unwrap();
 
-    // TODO:
-    // Pull out a db module and connect with sqlx.
-    // Save the Gtfs struct above into it (skipping things that already exist).
-    //
-    // Then switch over to a periodic task that pulls from the translink url.
+    let mut conn = connect().await?;
+    conn.run_migrations().await?;
+    debug!(conn=?conn);
+    return Ok(());
 
-    gtfs.print_stats();
+    // gtfs.print_stats();
     return Ok(());
 
     loop {
