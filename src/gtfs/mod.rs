@@ -4,6 +4,8 @@
 //! - Loading static gtfs data via gtfs-structures.
 //! - Loading real time gtfs data via protobufs.
 //! - Cleaning that up and verifying it.
+mod static_gtfs;
+
 use std::collections::HashMap;
 
 use crate::transit_realtime::FeedMessage;
