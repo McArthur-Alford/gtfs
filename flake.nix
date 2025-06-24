@@ -35,7 +35,7 @@
       in
       {
         devShells.default = craneLib.devShell {
-          RUST_LOG = "debug";
+          RUST_LOG = "gtfs=debug,*=info";
           RUST_SRC_PATH = "${rust}/lib/rustlib/src/rust/library";
           DATABASE_URL = "postgresql://admin:admin@localhost:5432/gtfs_db";
 

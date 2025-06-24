@@ -18,17 +18,17 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 #[derive(Debug)]
 pub struct Db(pub PgPool);
 
-/// Attempt to connect to the database, using DATABASE_URL.
-#[instrument]
-pub async fn connect() -> Result<Db> {
-    info!("Attempting to connect to db");
-    let db_url = vars::db_url();
-    let pool = PgPool::connect(&db_url).await?;
-    info!("Connected to db");
-    Ok(Db(pool))
-}
-
 impl Db {
+    /// Attempt to connect to the database, using DATABASE_URL.
+    #[instrument]
+    pub async fn connect() -> Result<Db> {
+        info!("Attempting to connect to db");
+        let db_url = vars::db_url();
+        let pool = PgPool::connect(&db_url).await?;
+        info!("Connected to db");
+        Ok(Db(pool))
+    }
+
     /// Run the migrations on the database, using MIGRATOR
     #[instrument(name = "db_migrations", skip(self))]
     pub async fn run_migrations(&mut self) -> Result<()> {

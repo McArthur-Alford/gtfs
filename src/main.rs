@@ -1,16 +1,30 @@
+pub mod bridge;
 pub mod db;
+pub mod gtfs;
 pub mod vars;
 
+use crate::bridge::ToDB;
 use anyhow::Result;
 use prost::Message;
+use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, error, info};
 use tracing_subscriber::{EnvFilter, field::MakeExt};
 
-use crate::db::connect;
+use crate::{
+    db::Db,
+    gtfs::{last_modified, load_realtime_gtfs, load_static_gtfs},
+    transit_realtime::FeedMessage,
+    vars::{REALTIME_URL, STATIC_URL, realtime_urls},
+};
 
 pub mod transit_realtime {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
+}
+
+pub struct State {
+    db: Db,
+    client: Client,
 }
 
 #[tokio::main]
@@ -20,17 +34,20 @@ async fn main() -> Result<()> {
         .map_fmt_fields(|f| f.debug_alt())
         .init();
 
-    info!("Starting");
+    // Set up the DB connection pool
+    let mut db = Db::connect().await?;
+    db.run_migrations().await?;
 
-    // let gtfs = load_gtfs("./seq_gtfs.zip".to_owned()).await.unwrap();
+    // Set up the reqwest client
+    let client = Client::new();
 
-    let mut conn = connect().await?;
-    conn.run_migrations().await?;
-    debug!(conn=?conn);
-    return Ok(());
+    let state = State { db, client };
 
-    // gtfs.print_stats();
-    return Ok(());
+    let gtfs = load_static_gtfs("./seq_gtfs.zip".to_owned()).await?;
+
+    let gtfs = gtfs.0.to_db().await;
+
+    debug!(gtfs=?gtfs);
 
     loop {
         if let Err(e) = poll().await {
@@ -38,11 +55,6 @@ async fn main() -> Result<()> {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-}
-
-async fn load_gtfs(url: String) -> Result<gtfs_structures::Gtfs> {
-    let gtfs = gtfs_structures::Gtfs::new(&url)?;
-    Ok(gtfs)
 }
 
 async fn poll() -> Result<()> {
@@ -64,8 +76,10 @@ async fn poll() -> Result<()> {
             continue;
         };
 
-        debug!(trip=?trip);
+        // debug!(trip=?trip);
     }
+
+    info!("Polled");
 
     Ok(())
 }
