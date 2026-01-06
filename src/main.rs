@@ -40,9 +40,9 @@ async fn main() -> Result<()> {
     let mut db = Db::connect().await?;
     db.run_migrations().await?;
 
-    setup_static_poll_schedule().await?;
+    // setup_static_poll_schedule().await.unwrap();
 
-    // Set up the request client
+    // Set up the reqwest client
     let client = Client::new();
 
     let state = State { db, client };
