@@ -6,7 +6,9 @@ pub mod vars;
 use anyhow::Result;
 use prost::Message;
 use reqwest::Client;
+use std::env;
 use std::time::Duration;
+use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, info};
 use tracing_subscriber::{EnvFilter, field::MakeExt};
 
@@ -38,7 +40,9 @@ async fn main() -> Result<()> {
     let mut db = Db::connect().await?;
     db.run_migrations().await?;
 
-    // Set up the reqwest client
+    setup_static_poll_schedule().await?;
+
+    // Set up the request client
     let client = Client::new();
 
     let state = State { db, client };
@@ -50,14 +54,43 @@ async fn main() -> Result<()> {
     // debug!(gtfs=?gtfs);
 
     loop {
-        if let Err(e) = poll().await {
+        if let Err(e) = dynamic_poll().await {
             error!(e=?e);
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
 
-async fn poll() -> Result<()> {
+async fn setup_static_poll_schedule() -> Result<()> {
+    let fetch_hour_of_day: u32 = env::var("STATIC_FETCH_TIME_OF_DAY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3);
+
+    let sched = JobScheduler::new().await?;
+    sched
+        .add(Job::new_async(
+            format!("0 {} * * *", fetch_hour_of_day),
+            |_uuid, _l| {
+                Box::pin(async move {
+                    if let Err(e) = static_poll().await {
+                        eprintln!("Unable to poll static data: {e}");
+                    }
+                })
+            },
+        )?)
+        .await?;
+    sched.start().await?;
+
+    return Ok(());
+}
+
+async fn static_poll() -> Result<()> {
+    // do the stuff
+    todo!()
+}
+
+async fn dynamic_poll() -> Result<()> {
     let pb = reqwest::get("https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates")
         .await?
         .bytes()
