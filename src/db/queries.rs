@@ -6,10 +6,10 @@
 use std::path::Path;
 
 use super::types::*;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};
-use sqlx::PgPool;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
+use sqlx::{PgConnection, PgPool, Postgres, Transaction};
 
-pub async fn insert_agency(agency: &Agency, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_agency(agency: &Agency, pool: &mut PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO agency (agency_name, agency_url, agency_timezone, agency_lang, agency_phone)
@@ -26,7 +26,7 @@ pub async fn insert_agency(agency: &Agency, pool: &PgPool) -> Result<(), sqlx::E
     Ok(())
 }
 
-pub async fn insert_stop(stop: &Stop, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_stop(stop: &Stop, pool: &mut PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO stops (
@@ -52,7 +52,7 @@ pub async fn insert_stop(stop: &Stop, pool: &PgPool) -> Result<(), sqlx::Error> 
     Ok(())
 }
 
-pub async fn insert_route(route: &Route, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_route(route: &Route, pool: &mut PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO routes (
@@ -75,7 +75,7 @@ pub async fn insert_route(route: &Route, pool: &PgPool) -> Result<(), sqlx::Erro
     Ok(())
 }
 
-pub async fn insert_trip(trip: &Trip, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_trip(trip: &Trip, pool: &mut PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO trips (
@@ -97,7 +97,10 @@ pub async fn insert_trip(trip: &Trip, pool: &PgPool) -> Result<(), sqlx::Error> 
     Ok(())
 }
 
-pub async fn insert_stop_time(stop_time: &StopTime, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_stop_time(
+    stop_time: &StopTime,
+    pool: &mut PgConnection,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO stop_times (
@@ -119,7 +122,10 @@ pub async fn insert_stop_time(stop_time: &StopTime, pool: &PgPool) -> Result<(),
     Ok(())
 }
 
-pub async fn insert_calendar(calendar: &Calendar, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_calendar(
+    calendar: &Calendar,
+    pool: &mut PgConnection,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO calendar (
@@ -144,7 +150,10 @@ pub async fn insert_calendar(calendar: &Calendar, pool: &PgPool) -> Result<(), s
     Ok(())
 }
 
-pub async fn insert_calendar_date(cd: &CalendarDate, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_calendar_date(
+    cd: &CalendarDate,
+    pool: &mut PgConnection,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO calendar_dates (
@@ -161,7 +170,7 @@ pub async fn insert_calendar_date(cd: &CalendarDate, pool: &PgPool) -> Result<()
     Ok(())
 }
 
-pub async fn insert_shape(shape: &Shape, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_shape(shape: &Shape, pool: &mut PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO shapes (
@@ -179,23 +188,39 @@ pub async fn insert_shape(shape: &Shape, pool: &PgPool) -> Result<(), sqlx::Erro
     Ok(())
 }
 
-pub async fn insert_feed_info(feed: &FeedInfo, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_feed_info(feed: &FeedInfo, pool: &mut PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO feed_info (
             feed_publisher_name, feed_publisher_url,
-            feed_region, feed_lang, feed_start_date,
-            feed_end_date, feed_last_update
+            feed_lang, feed_start_date, feed_end_date
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7)
+        VALUES ($1,$2,$3,$4,$5)
         "#,
         feed.feed_publisher_name,
         feed.feed_publisher_url,
-        feed.feed_region,
         feed.feed_lang,
         feed.feed_start_date,
-        feed.feed_end_date,
-        feed.feed_last_update
+        feed.feed_end_date
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn insert_last_update(
+    last_update: &LastUpdate,
+    pool: &mut PgConnection,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT INTO last_update (
+            feed_region, feed_last_update
+        )
+        VALUES ($1,$2)
+        "#,
+        last_update.feed_region,
+        last_update.feed_last_update
     )
     .execute(pool)
     .await?;
@@ -205,17 +230,18 @@ pub async fn insert_feed_info(feed: &FeedInfo, pool: &PgPool) -> Result<(), sqlx
 pub async fn get_feed_last_update(
     feed_region: String,
     pool: &PgPool,
-) -> Result<NaiveDateTime, sqlx::Error> {
+) -> Result<Option<NaiveDateTime>, sqlx::Error> {
     let row = sqlx::query!(
         r#"
         SELECT feed_last_update
-        FROM feed_info
+        FROM last_update
         WHERE feed_region = $1
         "#,
         feed_region
     )
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await?;
 
-    Ok(row.feed_last_update)
+    // Default to 1970-01-01 00:00:00 (the "zero" NaiveDateTime)
+    Ok(row.map(|r| r.feed_last_update))
 }

@@ -3,8 +3,17 @@
 //! Types for database operations.
 //! Should directly map to the schema tables.
 
-use chrono::{NaiveDate, NaiveDateTime};
-use sqlx::{FromRow, postgres::types::PgInterval};
+use chrono::{NaiveDate, NaiveDateTime, Timelike, Utc};
+use sqlx::{FromRow, PgConnection, postgres::types::PgInterval};
+
+use crate::db::{self, Db, queries::*};
+
+pub trait InsertDB: Sized + Send + Sync {
+    fn insert(
+        &self,
+        pool: &mut PgConnection,
+    ) -> impl std::future::Future<Output = Result<(), sqlx::Error>> + std::marker::Send;
+}
 
 /// Representation of agency table rows
 #[derive(Debug, FromRow, PartialEq, Eq)]
@@ -106,9 +115,82 @@ pub struct Shape {
 pub struct FeedInfo {
     pub feed_publisher_name: String,
     pub feed_publisher_url: String,
-    pub feed_region: String,
     pub feed_lang: Option<String>,
     pub feed_start_date: Option<NaiveDate>,
     pub feed_end_date: Option<NaiveDate>,
+}
+
+/// Representation of feed_last_update table rows
+#[derive(Debug, FromRow, PartialEq, Eq)]
+pub struct LastUpdate {
+    pub feed_region: String,
     pub feed_last_update: NaiveDateTime,
+}
+
+impl LastUpdate {
+    pub fn new(feed_region: String) -> LastUpdate {
+        LastUpdate {
+            feed_region,
+            feed_last_update: Utc::now()
+                .with_nanosecond(0)
+                .unwrap_or(Utc::now())
+                .naive_utc(),
+        }
+    }
+}
+
+impl InsertDB for Agency {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_agency(self, db).await
+    }
+}
+impl InsertDB for Stop {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_stop(self, db).await
+    }
+}
+impl InsertDB for Route {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_route(self, db).await
+    }
+}
+impl InsertDB for Trip {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_trip(self, db).await
+    }
+}
+impl InsertDB for StopTime {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_stop_time(self, db).await
+    }
+}
+
+impl InsertDB for Calendar {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_calendar(self, db).await
+    }
+}
+
+impl InsertDB for CalendarDate {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_calendar_date(self, db).await
+    }
+}
+
+impl InsertDB for Shape {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_shape(self, db).await
+    }
+}
+
+impl InsertDB for FeedInfo {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_feed_info(self, db).await
+    }
+}
+
+impl InsertDB for LastUpdate {
+    async fn insert(&self, db: &mut PgConnection) -> Result<(), sqlx::Error> {
+        insert_last_update(self, db).await
+    }
 }

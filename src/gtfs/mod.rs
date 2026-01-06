@@ -9,6 +9,7 @@ mod static_gtfs;
 use std::collections::HashMap;
 
 use crate::db::queries;
+use crate::db::types::LastUpdate;
 use crate::transit_realtime::FeedMessage;
 use anyhow::Context;
 use anyhow::Result;
@@ -27,7 +28,19 @@ use tokio::task::spawn_blocking;
 use tracing::{info, instrument};
 
 /// Static GTFS wrapper.
-pub struct StaticGtfs(pub RawGtfs);
+pub struct StaticGtfs {
+    pub raw_gtfs: RawGtfs,
+    pub last_update: LastUpdate,
+}
+
+impl StaticGtfs {
+    pub fn new(raw_gtfs: RawGtfs, last_update: LastUpdate) -> StaticGtfs {
+        StaticGtfs {
+            raw_gtfs,
+            last_update,
+        }
+    }
+}
 
 /// Realtime GTFS wrapper. Stores a vec of FeedMessages, as there may be multiple.
 pub struct RealtimeGtfs(pub Vec<FeedMessage>);
@@ -49,16 +62,21 @@ pub async fn last_modified(url: String, client: &Client) -> Result<Option<DateTi
 #[instrument]
 pub async fn load_static_gtfs(
     url: String,
-    last_update: NaiveDateTime,
+    last_update: Option<NaiveDateTime>,
 ) -> Result<Option<StaticGtfs>> {
-    if !is_url_content_outdated(&url, last_update).await? {
+    if let Some(last_update) = last_update
+        && !is_url_content_outdated(&url, last_update).await?
+    {
         return Ok(None);
     }
 
     info!("Loading static GTFS. This may take a while.");
     let gtfs = spawn_blocking(move || RawGtfs::new(&url)).await??;
     info!("Finished loading static GTFS");
-    Ok(Some(StaticGtfs(gtfs)))
+    Ok(Some(StaticGtfs::new(
+        gtfs,
+        LastUpdate::new("SEQ".to_owned()),
+    )))
 }
 
 pub async fn is_url_content_outdated(url: &String, cutoff: NaiveDateTime) -> Result<bool> {

@@ -7,7 +7,16 @@ pub mod queries;
 mod tests;
 pub mod types;
 
-use crate::vars;
+use crate::{
+    db::{
+        queries::{
+            insert_agency, insert_calendar, insert_calendar_date, insert_feed_info, insert_route,
+            insert_shape, insert_stop, insert_stop_time, insert_trip,
+        },
+        types::{Agency, Calendar, CalendarDate, FeedInfo, Route, Shape, Stop, StopTime, Trip},
+    },
+    vars,
+};
 use anyhow::Result;
 use sqlx::PgPool;
 use tracing::{info, instrument};

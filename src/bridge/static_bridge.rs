@@ -1,11 +1,19 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use crate::db;
+use crate::{
+    db::{self, types::InsertDB},
+    gtfs::StaticGtfs,
+};
 use anyhow::{Context, Result, anyhow};
 use chrono::{NaiveDate, NaiveDateTime};
+use futures::{Stream, StreamExt};
+use gtfs_structures::FeedInfo;
 use rayon::prelude::*;
-use sqlx::postgres::types::PgInterval;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use sqlx::{PgConnection, PgPool, Postgres, Transaction, postgres::types::PgInterval};
+use tokio::{
+    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+    task::JoinHandle,
+};
 use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 
 #[derive(Debug)]
@@ -21,7 +29,7 @@ pub struct GtfsDbModel {
     pub feed_info: ReceiverStream<db::types::FeedInfo>,
 }
 
-fn stream_converted<T, U>(items: Vec<T>, chunk_size: usize) -> UnboundedReceiverStream<U>
+fn convert<T, U>(items: Vec<T>, chunk_size: usize) -> UnboundedReceiver<U>
 where
     T: ToDB<U> + Send + Sync + Clone + 'static,
     U: Send + Sync + 'static,
@@ -44,7 +52,54 @@ where
         });
     });
 
-    UnboundedReceiverStream::new(receiver)
+    receiver
+}
+
+async fn spawn_stream_inserter<T: InsertDB + Send + Sync + 'static>(
+    tx: &mut PgConnection,
+    mut rx: UnboundedReceiver<T>,
+)
+//-> JoinHandle<()>
+{
+    // tokio::spawn(async move {
+    while let Some(item) = rx.recv().await {
+        item.insert(&mut *tx).await.unwrap();
+    }
+    // })
+}
+
+impl StaticGtfs {
+    pub async fn insert_db(self, db: db::Db) -> Result<()> {
+        let mut tx = db.0.begin().await?;
+        self.last_update.insert(&mut *tx);
+        spawn_stream_inserter(&mut *tx, convert(self.raw_gtfs.agencies?, 1024)).await;
+        tx.commit().await.ok();
+        let mut tx = db.0.begin().await?;
+        spawn_stream_inserter(&mut *tx, convert(self.raw_gtfs.stops?, 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.raw_gtfs.routes?, 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.raw_gtfs.trips?, 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.raw_gtfs.stop_times?, 1024)).await;
+
+        if let Some(calendar) = self.raw_gtfs.calendar {
+            spawn_stream_inserter(&mut *tx, convert(calendar?, 1024)).await;
+        }
+
+        if let Some(calendar_dates) = self.raw_gtfs.calendar_dates {
+            spawn_stream_inserter(&mut *tx, convert(calendar_dates?, 1024)).await;
+        }
+
+        if let Some(shapes) = self.raw_gtfs.shapes {
+            spawn_stream_inserter(&mut *tx, convert(shapes?, 1024)).await;
+        }
+
+        if let Some(feed_info) = self.raw_gtfs.feed_info {
+            spawn_stream_inserter(&mut *tx, convert(feed_info?, 1024)).await;
+        }
+
+        tx.commit().await.ok();
+
+        Ok(())
+    }
 }
 
 pub trait ToDB<T>: Send {
@@ -192,8 +247,14 @@ impl ToDB<db::types::Route> for gtfs_structures::Route {
             route_desc: self.desc,
             route_type: self.route_type.to_db()?,
             route_url: self.url,
-            route_color: Some(self.color.to_string()),
-            route_text_color: Some(self.text_color.to_string()),
+            route_color: Some(format!(
+                "{:02X}{:02X}{:02X}",
+                self.color.r, self.color.g, self.color.b
+            )),
+            route_text_color: Some(format!(
+                "{:02X}{:02X}{:02X}",
+                self.text_color.r, self.text_color.g, self.text_color.b
+            )),
         })
     }
 }
@@ -236,22 +297,14 @@ impl ToDB<db::types::Shape> for gtfs_structures::Shape {
     }
 }
 
-struct FeedInfoWrapper {
-    feed_info: gtfs_structures::FeedInfo,
-    feed_region: String,
-    feed_last_updated: NaiveDateTime,
-}
-
-impl ToDB<db::types::FeedInfo> for FeedInfoWrapper {
+impl ToDB<db::types::FeedInfo> for gtfs_structures::FeedInfo {
     fn to_db(self) -> Result<db::types::FeedInfo> {
         Ok(db::types::FeedInfo {
-            feed_publisher_name: self.feed_info.name,
-            feed_publisher_url: self.feed_info.url,
-            feed_region: self.feed_region,
-            feed_lang: Some(self.feed_info.lang),
-            feed_start_date: self.feed_info.start_date,
-            feed_end_date: self.feed_info.end_date,
-            feed_last_update: self.feed_last_updated,
+            feed_publisher_name: self.name,
+            feed_publisher_url: self.url,
+            feed_lang: Some(self.lang),
+            feed_start_date: self.start_date,
+            feed_end_date: self.end_date,
         })
     }
 }

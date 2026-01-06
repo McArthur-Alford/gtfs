@@ -3,7 +3,7 @@
 //! Specifically tests db queries and operations.
 //! Does not test a gtfs dataset properly.
 
-use crate::{bridge::ToDB, db::queries::get_feed_last_update};
+use crate::db::queries::{get_feed_last_update, insert_last_update};
 
 #[cfg(test)]
 use super::queries::{
@@ -18,6 +18,7 @@ use tracing_test::traced_test;
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_agency(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let agency = Agency {
         agency_name: "Translink".into(),
         agency_url: "https://translink.com.au/".into(),
@@ -25,15 +26,17 @@ async fn test_agency(pool: PgPool) -> sqlx::Result<()> {
         agency_lang: Some("en".into()),
         agency_phone: Some("13 12 30".into()),
     };
-    insert_agency(&agency, &pool).await?;
+    insert_agency(&agency, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         Agency,
         "SELECT * FROM agency WHERE agency_name = $1",
         &agency.agency_name
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, agency);
     Ok(())
@@ -42,6 +45,7 @@ async fn test_agency(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_calendar(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let cal = Calendar {
         service_id: "GCLR 24_25-36991".into(),
         monday: true,
@@ -54,15 +58,17 @@ async fn test_calendar(pool: PgPool) -> sqlx::Result<()> {
         start_date: NaiveDate::from_yo_opt(2026, 1).unwrap(),
         end_date: NaiveDate::from_yo_opt(2026, 12).unwrap(),
     };
-    insert_calendar(&cal, &pool).await?;
+    insert_calendar(&cal, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         Calendar,
         "SELECT * FROM calendar WHERE service_id = $1",
         &cal.service_id
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, cal);
     Ok(())
@@ -71,12 +77,13 @@ async fn test_calendar(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_calendar_date(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let cd = CalendarDate {
         service_id: "BCC 25_26-39839".into(),
         date: NaiveDate::from_yo_opt(2026, 1).unwrap(),
         exception_type: 1,
     };
-    insert_calendar_date(&cd, &pool).await?;
+    insert_calendar_date(&cd, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         CalendarDate,
@@ -84,8 +91,10 @@ async fn test_calendar_date(pool: PgPool) -> sqlx::Result<()> {
         &cd.service_id,
         cd.date
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, cd);
     Ok(())
@@ -94,24 +103,25 @@ async fn test_calendar_date(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_feed_info(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let feed = FeedInfo {
         feed_publisher_name: "Department of Transport and Main Roads - Translink Division".into(),
         feed_publisher_url: "https://www.translink.com.au/".into(),
-        feed_region: "SEQ".into(),
         feed_lang: Some("en".into()),
         feed_start_date: Some(NaiveDate::from_yo_opt(2026, 1).unwrap()),
         feed_end_date: Some(NaiveDate::from_yo_opt(2026, 100).unwrap()),
-        feed_last_update: Utc::now().with_nanosecond(0).unwrap().naive_utc(),
     };
-    insert_feed_info(&feed, &pool).await?;
+    insert_feed_info(&feed, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         FeedInfo,
         "SELECT * FROM feed_info WHERE feed_publisher_name = $1",
         &feed.feed_publisher_name
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, feed);
     Ok(())
@@ -119,7 +129,32 @@ async fn test_feed_info(pool: PgPool) -> sqlx::Result<()> {
 
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
+async fn test_last_update(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
+    let last_update = LastUpdate {
+        feed_region: "SEQ".to_owned(),
+        feed_last_update: Utc::now().with_nanosecond(0).unwrap().naive_utc(),
+    };
+    insert_last_update(&last_update, &mut *pool).await?;
+
+    let row = sqlx::query_as!(
+        LastUpdate,
+        "SELECT * FROM last_update WHERE feed_region = $1",
+        &last_update.feed_region
+    )
+    .fetch_one(&mut *pool)
+    .await?;
+
+    pool.commit().await?;
+
+    assert_eq!(row, last_update);
+    Ok(())
+}
+
+#[traced_test]
+#[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_route(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let route = Route {
         route_id: "19-4158".into(),
         route_short_name: Some("19".into()),
@@ -130,15 +165,17 @@ async fn test_route(pool: PgPool) -> sqlx::Result<()> {
         route_color: Some("E463A4".into()),
         route_text_color: Some("000000".into()),
     };
-    insert_route(&route, &pool).await?;
+    insert_route(&route, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         Route,
         "SELECT * FROM routes WHERE route_id = $1",
         &route.route_id
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, route);
     Ok(())
@@ -147,13 +184,14 @@ async fn test_route(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_shape(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let shape = Shape {
         shape_id: "190008".into(),
         shape_pt_lat: -27.553364,
         shape_pt_lon: 153.023933,
         shape_pt_sequence: 10001,
     };
-    insert_shape(&shape, &pool).await?;
+    insert_shape(&shape, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         Shape,
@@ -161,8 +199,10 @@ async fn test_shape(pool: PgPool) -> sqlx::Result<()> {
         &shape.shape_id,
         &shape.shape_pt_sequence
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, shape);
     Ok(())
@@ -171,6 +211,7 @@ async fn test_shape(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_stop(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let stop = Stop {
         stop_id: "1".into(),
         stop_code: Some("000001".into()),
@@ -184,15 +225,17 @@ async fn test_stop(pool: PgPool) -> sqlx::Result<()> {
         parent_station: None,
         platform_code: None,
     };
-    insert_stop(&stop, &pool).await?;
+    insert_stop(&stop, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         Stop,
         "SELECT * FROM stops WHERE stop_id = $1",
         &stop.stop_id
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, stop);
     Ok(())
@@ -201,6 +244,7 @@ async fn test_stop(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_trip(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let route = Route {
         route_id: "R600-3454".into(),
         route_short_name: Some("19".into()),
@@ -211,7 +255,7 @@ async fn test_trip(pool: PgPool) -> sqlx::Result<()> {
         route_color: Some("E463A4".into()),
         route_text_color: Some("000000".into()),
     };
-    insert_route(&route, &pool).await?;
+    insert_route(&route, &mut *pool).await?;
 
     let trip = Trip {
         route_id: "R600-3454".into(),
@@ -222,15 +266,17 @@ async fn test_trip(pool: PgPool) -> sqlx::Result<()> {
         block_id: None,
         shape_id: Some("R6000053".into()),
     };
-    insert_trip(&trip, &pool).await?;
+    insert_trip(&trip, &mut *pool).await?;
 
     let row = sqlx::query_as!(
         Trip,
         "SELECT * FROM trips WHERE trip_id = $1",
         &trip.trip_id
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, trip);
     Ok(())
@@ -239,6 +285,7 @@ async fn test_trip(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
+    let mut pool = pool.begin().await?;
     let stop = Stop {
         stop_id: "1".into(),
         stop_code: Some("000001".into()),
@@ -252,7 +299,7 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
         parent_station: None,
         platform_code: None,
     };
-    insert_stop(&stop, &pool).await?;
+    insert_stop(&stop, &mut *pool).await?;
 
     let route = Route {
         route_id: "R600-3454".into(),
@@ -264,7 +311,7 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
         route_color: Some("E463A4".into()),
         route_text_color: Some("000000".into()),
     };
-    insert_route(&route, &pool).await?;
+    insert_route(&route, &mut *pool).await?;
 
     let trip = Trip {
         route_id: "R600-3454".into(),
@@ -275,7 +322,7 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
         block_id: None,
         shape_id: Some("R6000053".into()),
     };
-    insert_trip(&trip, &pool).await?;
+    insert_trip(&trip, &mut *pool).await?;
 
     let stop_time = StopTime {
         trip_id: trip.trip_id.clone(),
@@ -294,7 +341,7 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
         pickup_type: 0,
         drop_off_type: 0,
     };
-    insert_stop_time(&stop_time, &pool).await?;
+    insert_stop_time(&stop_time, &mut *pool).await?;
 
     let row: StopTime = sqlx::query_as!(
         StopTime,
@@ -302,8 +349,10 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
         &stop_time.trip_id,
         &stop_time.stop_id
     )
-    .fetch_one(&pool)
+    .fetch_one(&mut *pool)
     .await?;
+
+    pool.commit().await?;
 
     assert_eq!(row, stop_time);
     Ok(())
@@ -312,22 +361,20 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
 #[traced_test]
 #[sqlx::test(migrator = "super::MIGRATOR")]
 async fn test_get_feed_last_update(pool: PgPool) -> sqlx::Result<()> {
+    let mut transaction = pool.begin().await?;
     let expected_last_update = Utc::now().with_nanosecond(0).unwrap().naive_utc();
     let region = "SEQ".to_owned();
 
-    let feed = FeedInfo {
-        feed_publisher_name: "Department of Transport and Main Roads - Translink Division".into(),
-        feed_publisher_url: "https://www.translink.com.au/".into(),
+    let last_update = LastUpdate {
         feed_region: region.clone(),
-        feed_lang: Some("en".into()),
-        feed_start_date: Some(NaiveDate::from_yo_opt(2026, 1).unwrap()),
-        feed_end_date: Some(NaiveDate::from_yo_opt(2026, 100).unwrap()),
         feed_last_update: expected_last_update.clone(),
     };
-    insert_feed_info(&feed, &pool).await?;
+    insert_last_update(&last_update, &mut *transaction).await?;
+
+    transaction.commit().await?;
 
     let actual_last_update = get_feed_last_update(region, &pool).await?;
 
-    assert_eq!(expected_last_update, actual_last_update);
+    assert_eq!(expected_last_update, actual_last_update.unwrap());
     Ok(())
 }

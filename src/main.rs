@@ -3,7 +3,7 @@ pub mod db;
 pub mod gtfs;
 pub mod vars;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use prost::Message;
 use reqwest::Client;
 use std::time::Duration;
@@ -14,7 +14,6 @@ use tracing_subscriber::{EnvFilter, field::MakeExt};
 
 use crate::db::queries;
 use crate::{
-    bridge::ToDB,
     db::Db,
     gtfs::{last_modified, load_realtime_gtfs, load_static_gtfs},
     transit_realtime::FeedMessage,
@@ -42,14 +41,15 @@ async fn main() -> Result<()> {
     let mut db = Db::connect().await?;
     db.run_migrations().await?;
 
-    // Set up the request client
+    // setup_static_poll_schedule().await.unwrap();
+
+    // Set up the reqwest client
     let client = Client::new();
 
     let state = State { db, client };
 
-    // let gtfs = gtfs.0.to_db().await;
-
-    // debug!(gtfs=?gtfs);
+    // fire poll once immediately on boot
+    static_poll(state.clone()).await?;
 
     setup_static_poll_schedule(state.clone()).await?;
 
@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
         if let Err(e) = dynamic_poll().await {
             error!(e=?e);
         }
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_mins(1)).await;
     }
 }
 
@@ -69,16 +69,19 @@ async fn setup_static_poll_schedule(state: State) -> Result<()> {
 
     let sched = JobScheduler::new().await?;
     sched
-        .add(Job::new_async(format!("0 {} * * *", fetch_hour_of_day), {
-            move |_uuid, _l| {
-                let state = state.clone();
-                Box::pin(async move {
-                    if let Err(e) = static_poll(state).await {
-                        eprintln!("Unable to poll static data: {e}");
-                    }
-                })
-            }
-        })?)
+        .add(Job::new_async(
+            format!("0 0 {} * * *", fetch_hour_of_day),
+            {
+                move |_uuid, _l| {
+                    let state = state.clone();
+                    Box::pin(async move {
+                        if let Err(e) = static_poll(state).await {
+                            eprintln!("Unable to poll static data: {e}");
+                        }
+                    })
+                }
+            },
+        )?)
         .await?;
     sched.start().await?;
 
@@ -90,6 +93,10 @@ async fn static_poll(state: State) -> Result<()> {
     let last_update = queries::get_feed_last_update("SEQ".into(), &state.db.0).await?;
 
     let gtfs = load_static_gtfs("./seq_gtfs.zip".to_owned(), last_update).await?;
+
+    if let Some(gtfs) = gtfs {
+        gtfs.insert_db(state.db.clone()).await;
+    }
 
     Ok(())
 }

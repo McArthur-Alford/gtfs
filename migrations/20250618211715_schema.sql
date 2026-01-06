@@ -4,7 +4,7 @@
 DROP TABLE IF EXISTS agency CASCADE;
 CREATE TABLE agency
 (
-  agency_name            text NOT NULL,
+  agency_name            text PRIMARY KEY,
   agency_url             text NOT NULL,
   agency_timezone        text NOT NULL,
   agency_lang            text NULL,
@@ -45,7 +45,7 @@ CREATE TABLE trips
 (
   route_id               text NOT NULL REFERENCES routes ON DELETE CASCADE ON UPDATE CASCADE,
   service_id             text NOT NULL,
-  trip_id                text NOT NULL PRIMARY KEY,
+  trip_id                text PRIMARY KEY,
   trip_headsign          text NULL,
   direction_id           boolean NULL,
   block_id               text NULL,
@@ -61,7 +61,8 @@ CREATE TABLE stop_times
   stop_id                text NOT NULL REFERENCES stops ON DELETE CASCADE ON UPDATE CASCADE,
   stop_sequence          integer NOT NULL CHECK (stop_sequence >= 0),
   pickup_type            integer NOT NULL CHECK (pickup_type >= 0 AND pickup_type <= 3),
-  drop_off_type          integer NOT NULL CHECK (drop_off_type >= 0 AND drop_off_type <= 3)
+  drop_off_type          integer NOT NULL CHECK (drop_off_type >= 0 AND drop_off_type <= 3),
+  PRIMARY KEY (trip_id, stop_sequence)
 );
 
 DROP TABLE IF EXISTS calendar CASCADE;
@@ -84,7 +85,8 @@ CREATE TABLE calendar_dates
 (
   service_id             text NOT NULL,
   date                   date NOT NULL,
-  exception_type         integer NOT NULL CHECK (exception_type >= 1 AND exception_type <= 2)
+  exception_type         integer NOT NULL CHECK (exception_type >= 1 AND exception_type <= 2),
+  PRIMARY KEY (service_id, date)
 );
 
 DROP TABLE IF EXISTS shapes CASCADE;
@@ -93,17 +95,23 @@ CREATE TABLE shapes
   shape_id               text NOT NULL,
   shape_pt_lat           double precision NOT NULL,
   shape_pt_lon           double precision NOT NULL,
-  shape_pt_sequence      integer NOT NULL CHECK (shape_pt_sequence >= 0)
+  shape_pt_sequence      integer NOT NULL CHECK (shape_pt_sequence >= 0),
+  PRIMARY KEY (shape_id, shape_pt_sequence)
 );
 
 DROP TABLE IF EXISTS feed_info CASCADE;
 CREATE TABLE feed_info
 (
-  feed_publisher_name    text NOT NULL,
+  feed_publisher_name    text PRIMARY KEY,
   feed_publisher_url     text NOT NULL,
-  feed_region            text NOT NULL,
   feed_lang              text NULL,
   feed_start_date        date NULL,
-  feed_end_date          date NULL,
-  feed_last_update       timestamp NOT NULL
+  feed_end_date          date NULL
 );
+
+DROP TABLE IF EXISTS last_update CASCADE;
+CREATE TABLE last_update
+(
+    feed_region            text PRIMARY KEY,
+    feed_last_update       timestamp NOT NULL
+)
