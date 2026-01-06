@@ -1,11 +1,18 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use crate::db;
+use crate::{
+    db::{self, types::InsertDB},
+    gtfs::StaticGtfs,
+};
 use anyhow::{Context, Result, anyhow};
 use chrono::NaiveDate;
+use futures::{Stream, StreamExt};
 use rayon::prelude::*;
-use sqlx::postgres::types::PgInterval;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use sqlx::{PgConnection, PgPool, Postgres, Transaction, postgres::types::PgInterval};
+use tokio::{
+    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+    task::JoinHandle,
+};
 use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 use tracing::error;
 
@@ -22,7 +29,7 @@ pub struct GtfsDbModel {
     pub feed_info: ReceiverStream<db::types::FeedInfo>,
 }
 
-fn stream_converted<T, U>(items: Vec<T>, chunk_size: usize) -> UnboundedReceiverStream<U>
+fn convert<T, U>(items: Vec<T>, chunk_size: usize) -> UnboundedReceiver<U>
 where
     T: ToDB<U> + Send + Sync + Clone + 'static,
     U: Send + Sync + 'static,
@@ -45,7 +52,42 @@ where
         });
     });
 
-    UnboundedReceiverStream::new(receiver)
+    receiver
+}
+
+async fn spawn_stream_inserter<T: InsertDB + Send + Sync + 'static>(
+    tx: &mut PgConnection,
+    mut rx: UnboundedReceiver<T>,
+)
+//-> JoinHandle<()>
+{
+    // tokio::spawn(async move {
+    while let Some(item) = rx.recv().await {
+        item.insert(&mut *tx).await.unwrap();
+    }
+    // })
+}
+
+impl StaticGtfs {
+    pub async fn insert_db(self, db: db::Db) {
+        let mut tx = db.0.begin().await.unwrap();
+        spawn_stream_inserter(&mut *tx, convert(self.0.agencies.unwrap(), 1024)).await;
+        tx.commit().await.ok();
+        let mut tx = db.0.begin().await.unwrap();
+        spawn_stream_inserter(&mut *tx, convert(self.0.stops.unwrap(), 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.0.routes.unwrap(), 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.0.trips.unwrap(), 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.0.stop_times.unwrap(), 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.0.calendar.unwrap().unwrap(), 1024)).await;
+        spawn_stream_inserter(
+            &mut *tx,
+            convert(self.0.calendar_dates.unwrap().unwrap(), 1024),
+        )
+        .await;
+        spawn_stream_inserter(&mut *tx, convert(self.0.shapes.unwrap().unwrap(), 1024)).await;
+        spawn_stream_inserter(&mut *tx, convert(self.0.feed_info.unwrap().unwrap(), 1024)).await;
+        tx.commit().await.ok();
+    }
 }
 
 pub trait ToDB<T>: Send {
@@ -202,8 +244,14 @@ impl ToDB<db::types::Route> for gtfs_structures::Route {
             route_desc: self.desc,
             route_type: self.route_type.to_db()?,
             route_url: self.url,
-            route_color: Some(self.color.to_string()),
-            route_text_color: Some(self.text_color.to_string()),
+            route_color: Some(format!(
+                "{:02X}{:02X}{:02X}",
+                self.color.r, self.color.g, self.color.b
+            )),
+            route_text_color: Some(format!(
+                "{:02X}{:02X}{:02X}",
+                self.text_color.r, self.text_color.g, self.text_color.b
+            )),
         })
     }
 }

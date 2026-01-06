@@ -3,7 +3,7 @@ pub mod db;
 pub mod gtfs;
 pub mod vars;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use prost::Message;
 use reqwest::Client;
 use std::time::Duration;
@@ -45,9 +45,15 @@ async fn main() -> Result<()> {
 
     let gtfs = load_static_gtfs("./seq_gtfs.zip".to_owned()).await?;
 
+    gtfs.insert_db(state.db.clone()).await;
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
     // let gtfs = gtfs.0.to_db().await;
 
     // debug!(gtfs=?gtfs);
+
+    panic!();
 
     loop {
         if let Err(e) = poll().await {
