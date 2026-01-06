@@ -80,6 +80,10 @@ pub async fn load_static_gtfs(
 }
 
 pub async fn is_url_content_outdated(url: &String, cutoff: NaiveDateTime) -> Result<bool> {
+    if !url.starts_with("https://") {
+        return Ok(false);
+    }
+
     let client = Client::new();
 
     let head = client
