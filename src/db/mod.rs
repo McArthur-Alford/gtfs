@@ -15,7 +15,7 @@ use tracing::{info, instrument};
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// Db struct wraps the Db and provides a wonderful interface.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Db(pub PgPool);
 
 impl Db {

@@ -2,12 +2,11 @@ use std::time::Duration;
 
 use crate::db;
 use anyhow::{Context, Result, anyhow};
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use rayon::prelude::*;
 use sqlx::postgres::types::PgInterval;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
-use tracing::error;
 
 #[derive(Debug)]
 pub struct GtfsDbModel {
@@ -114,15 +113,6 @@ impl ToDB<i32> for gtfs_structures::PickupDropOffType {
     }
 }
 
-impl ToDB<i32> for NaiveDate {
-    fn to_db(self) -> Result<i32> {
-        self.format("%Y%m%d")
-            .to_string()
-            .parse::<i32>()
-            .context("Failed to format NaiveDate as i32 (yyyymmdd)")
-    }
-}
-
 impl ToDB<i32> for gtfs_structures::Exception {
     fn to_db(self) -> Result<i32> {
         Ok(match self {
@@ -219,8 +209,8 @@ impl ToDB<db::types::Calendar> for gtfs_structures::Calendar {
             friday: self.friday,
             saturday: self.saturday,
             sunday: self.sunday,
-            start_date: self.start_date.to_db()?.into(),
-            end_date: self.end_date.to_db()?.into(),
+            start_date: self.start_date,
+            end_date: self.end_date,
         })
     }
 }
@@ -229,7 +219,7 @@ impl ToDB<db::types::CalendarDate> for gtfs_structures::CalendarDate {
     fn to_db(self) -> Result<db::types::CalendarDate> {
         Ok(db::types::CalendarDate {
             service_id: self.service_id,
-            date: self.date.to_db()?.into(),
+            date: self.date,
             exception_type: self.exception_type.to_db()?,
         })
     }
@@ -246,14 +236,22 @@ impl ToDB<db::types::Shape> for gtfs_structures::Shape {
     }
 }
 
-impl ToDB<db::types::FeedInfo> for gtfs_structures::FeedInfo {
+struct FeedInfoWrapper {
+    feed_info: gtfs_structures::FeedInfo,
+    feed_region: String,
+    feed_last_updated: NaiveDateTime,
+}
+
+impl ToDB<db::types::FeedInfo> for FeedInfoWrapper {
     fn to_db(self) -> Result<db::types::FeedInfo> {
         Ok(db::types::FeedInfo {
-            feed_publisher_name: self.name,
-            feed_publisher_url: self.url,
-            feed_lang: Some(self.lang),
-            feed_start_date: self.start_date.map(|d| d.to_db()).transpose()?,
-            feed_end_date: self.end_date.map(|d| d.to_db()).transpose()?,
+            feed_publisher_name: self.feed_info.name,
+            feed_publisher_url: self.feed_info.url,
+            feed_region: self.feed_region,
+            feed_lang: Some(self.feed_info.lang),
+            feed_start_date: self.feed_info.start_date,
+            feed_end_date: self.feed_info.end_date,
+            feed_last_update: self.feed_last_updated,
         })
     }
 }

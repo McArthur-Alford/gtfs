@@ -3,13 +3,15 @@
 //! Specifically tests db queries and operations.
 //! Does not test a gtfs dataset properly.
 
+use crate::{bridge::ToDB, db::queries::get_feed_last_update};
+
 #[cfg(test)]
 use super::queries::{
     insert_agency, insert_calendar, insert_calendar_date, insert_feed_info, insert_route,
     insert_shape, insert_stop, insert_stop_time, insert_trip,
 };
 use super::types::*;
-use chrono::TimeDelta;
+use chrono::{NaiveDate, TimeDelta, Timelike, Utc};
 use sqlx::PgPool;
 use tracing_test::traced_test;
 
@@ -49,8 +51,8 @@ async fn test_calendar(pool: PgPool) -> sqlx::Result<()> {
         friday: false,
         saturday: false,
         sunday: false,
-        start_date: 20250617,
-        end_date: 20250626,
+        start_date: NaiveDate::from_yo_opt(2026, 1).unwrap(),
+        end_date: NaiveDate::from_yo_opt(2026, 12).unwrap(),
     };
     insert_calendar(&cal, &pool).await?;
 
@@ -71,7 +73,7 @@ async fn test_calendar(pool: PgPool) -> sqlx::Result<()> {
 async fn test_calendar_date(pool: PgPool) -> sqlx::Result<()> {
     let cd = CalendarDate {
         service_id: "BCC 25_26-39839".into(),
-        date: 20250813,
+        date: NaiveDate::from_yo_opt(2026, 1).unwrap(),
         exception_type: 1,
     };
     insert_calendar_date(&cd, &pool).await?;
@@ -80,7 +82,7 @@ async fn test_calendar_date(pool: PgPool) -> sqlx::Result<()> {
         CalendarDate,
         "SELECT * FROM calendar_dates WHERE service_id = $1 AND date = $2",
         &cd.service_id,
-        cd.date as i32
+        cd.date
     )
     .fetch_one(&pool)
     .await?;
@@ -95,9 +97,11 @@ async fn test_feed_info(pool: PgPool) -> sqlx::Result<()> {
     let feed = FeedInfo {
         feed_publisher_name: "Department of Transport and Main Roads - Translink Division".into(),
         feed_publisher_url: "https://www.translink.com.au/".into(),
+        feed_region: "SEQ".into(),
         feed_lang: Some("en".into()),
-        feed_start_date: Some(20250617),
-        feed_end_date: Some(20250816),
+        feed_start_date: Some(NaiveDate::from_yo_opt(2026, 1).unwrap()),
+        feed_end_date: Some(NaiveDate::from_yo_opt(2026, 100).unwrap()),
+        feed_last_update: Utc::now().with_nanosecond(0).unwrap().naive_utc(),
     };
     insert_feed_info(&feed, &pool).await?;
 
@@ -302,5 +306,28 @@ async fn test_stop_time(pool: PgPool) -> sqlx::Result<()> {
     .await?;
 
     assert_eq!(row, stop_time);
+    Ok(())
+}
+
+#[traced_test]
+#[sqlx::test(migrator = "super::MIGRATOR")]
+async fn test_get_feed_last_update(pool: PgPool) -> sqlx::Result<()> {
+    let expected_last_update = Utc::now().with_nanosecond(0).unwrap().naive_utc();
+    let region = "SEQ".to_owned();
+
+    let feed = FeedInfo {
+        feed_publisher_name: "Department of Transport and Main Roads - Translink Division".into(),
+        feed_publisher_url: "https://www.translink.com.au/".into(),
+        feed_region: region.clone(),
+        feed_lang: Some("en".into()),
+        feed_start_date: Some(NaiveDate::from_yo_opt(2026, 1).unwrap()),
+        feed_end_date: Some(NaiveDate::from_yo_opt(2026, 100).unwrap()),
+        feed_last_update: expected_last_update.clone(),
+    };
+    insert_feed_info(&feed, &pool).await?;
+
+    let actual_last_update = get_feed_last_update(region, &pool).await?;
+
+    assert_eq!(expected_last_update, actual_last_update);
     Ok(())
 }

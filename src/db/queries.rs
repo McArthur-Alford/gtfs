@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use super::types::*;
-use chrono::TimeDelta;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};
 use sqlx::PgPool;
 
 pub async fn insert_agency(agency: &Agency, pool: &PgPool) -> Result<(), sqlx::Error> {
@@ -136,8 +136,8 @@ pub async fn insert_calendar(calendar: &Calendar, pool: &PgPool) -> Result<(), s
         calendar.friday,
         calendar.saturday,
         calendar.sunday,
-        calendar.start_date as i64,
-        calendar.end_date as i64
+        calendar.start_date,
+        calendar.end_date
     )
     .execute(pool)
     .await?;
@@ -153,7 +153,7 @@ pub async fn insert_calendar_date(cd: &CalendarDate, pool: &PgPool) -> Result<()
         VALUES ($1,$2,$3)
         "#,
         cd.service_id,
-        cd.date as i64,
+        cd.date,
         cd.exception_type
     )
     .execute(pool)
@@ -184,17 +184,38 @@ pub async fn insert_feed_info(feed: &FeedInfo, pool: &PgPool) -> Result<(), sqlx
         r#"
         INSERT INTO feed_info (
             feed_publisher_name, feed_publisher_url,
-            feed_lang, feed_start_date, feed_end_date
+            feed_region, feed_lang, feed_start_date,
+            feed_end_date, feed_last_update
         )
-        VALUES ($1,$2,$3,$4,$5)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
         "#,
         feed.feed_publisher_name,
         feed.feed_publisher_url,
+        feed.feed_region,
         feed.feed_lang,
         feed.feed_start_date,
-        feed.feed_end_date
+        feed.feed_end_date,
+        feed.feed_last_update
     )
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn get_feed_last_update(
+    feed_region: String,
+    pool: &PgPool,
+) -> Result<NaiveDateTime, sqlx::Error> {
+    let row = sqlx::query!(
+        r#"
+        SELECT feed_last_update
+        FROM feed_info
+        WHERE feed_region = $1
+        "#,
+        feed_region
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(row.feed_last_update)
 }

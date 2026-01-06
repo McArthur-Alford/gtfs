@@ -3,6 +3,7 @@
 //! Types for database operations.
 //! Should directly map to the schema tables.
 
+use chrono::{NaiveDate, NaiveDateTime};
 use sqlx::{FromRow, postgres::types::PgInterval};
 
 /// Representation of agency table rows
@@ -79,15 +80,15 @@ pub struct Calendar {
     pub friday: bool,
     pub saturday: bool,
     pub sunday: bool,
-    pub start_date: i64,
-    pub end_date: i64,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
 }
 
 /// Representation of calendar_date table rows
 #[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct CalendarDate {
     pub service_id: String,
-    pub date: i64,
+    pub date: NaiveDate,
     pub exception_type: i32,
 }
 
@@ -105,7 +106,9 @@ pub struct Shape {
 pub struct FeedInfo {
     pub feed_publisher_name: String,
     pub feed_publisher_url: String,
+    pub feed_region: String,
     pub feed_lang: Option<String>,
-    pub feed_start_date: Option<i32>,
-    pub feed_end_date: Option<i32>,
+    pub feed_start_date: Option<NaiveDate>,
+    pub feed_end_date: Option<NaiveDate>,
+    pub feed_last_update: NaiveDateTime,
 }

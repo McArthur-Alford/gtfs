@@ -1,6 +1,6 @@
 -- Auto generated schema using the wonderful script from:
 -- https://github.com/tyleragreen/gtfs-schema/tree/master
- 
+
 DROP TABLE IF EXISTS agency CASCADE;
 CREATE TABLE agency
 (
@@ -75,15 +75,15 @@ CREATE TABLE calendar
   friday                 boolean NOT NULL,
   saturday               boolean NOT NULL,
   sunday                 boolean NOT NULL,
-  start_date             integer NOT NULL,
-  end_date               integer NOT NULL
+  start_date             date NOT NULL,
+  end_date               date NOT NULL
 );
 
 DROP TABLE IF EXISTS calendar_dates CASCADE;
 CREATE TABLE calendar_dates
 (
   service_id             text NOT NULL,
-  date                   integer NOT NULL,
+  date                   date NOT NULL,
   exception_type         integer NOT NULL CHECK (exception_type >= 1 AND exception_type <= 2)
 );
 
@@ -101,7 +101,9 @@ CREATE TABLE feed_info
 (
   feed_publisher_name    text NOT NULL,
   feed_publisher_url     text NOT NULL,
+  feed_region            text NOT NULL,
   feed_lang              text NULL,
-  feed_start_date        integer NULL,
-  feed_end_date          integer NULL
+  feed_start_date        date NULL,
+  feed_end_date          date NULL,
+  feed_last_update       timestamp NOT NULL
 );

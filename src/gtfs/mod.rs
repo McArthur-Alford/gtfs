@@ -8,17 +8,21 @@ mod static_gtfs;
 
 use std::collections::HashMap;
 
+use crate::db::queries;
 use crate::transit_realtime::FeedMessage;
 use anyhow::Context;
 use anyhow::Result;
-use anyhow::anyhow;
+use anyhow::bail;
 use chrono::DateTime;
 use chrono::FixedOffset;
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use futures::future::try_join_all;
 use gtfs_structures::Gtfs;
 use gtfs_structures::RawGtfs;
 use prost::Message;
 use reqwest::{Client, header::LAST_MODIFIED};
+use sqlx::PgPool;
 use tokio::task::spawn_blocking;
 use tracing::{info, instrument};
 
@@ -43,11 +47,41 @@ pub async fn last_modified(url: String, client: &Client) -> Result<Option<DateTi
 /// Loads a static gtfs feed from the given path, which is either a file or url.
 /// With the translink dataset this can take quite a while (~40 seconds on my pc).
 #[instrument]
-pub async fn load_static_gtfs(url: String) -> Result<StaticGtfs> {
+pub async fn load_static_gtfs(
+    url: String,
+    last_update: NaiveDateTime,
+) -> Result<Option<StaticGtfs>> {
+    if !is_url_content_outdated(&url, last_update).await? {
+        return Ok(None);
+    }
+
     info!("Loading static GTFS. This may take a while.");
     let gtfs = spawn_blocking(move || RawGtfs::new(&url)).await??;
     info!("Finished loading static GTFS");
-    Ok(StaticGtfs(gtfs))
+    Ok(Some(StaticGtfs(gtfs)))
+}
+
+pub async fn is_url_content_outdated(url: &String, cutoff: NaiveDateTime) -> Result<bool> {
+    let client = Client::new();
+
+    let head = client
+        .head(url)
+        .send()
+        .await
+        .context("Failed to send HEAD request")?;
+
+    let last_modified = head
+        .headers()
+        .get(reqwest::header::LAST_MODIFIED)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| DateTime::parse_from_rfc2822(s).ok())
+        .map(|dt| dt.naive_utc());
+
+    if let Some(modified) = last_modified {
+        return Ok(modified > cutoff);
+    }
+
+    bail!("No Last-Modified header found.");
 }
 
 /// Loads realtime gtfs updates.
