@@ -3,7 +3,6 @@ pub mod db;
 pub mod gtfs;
 pub mod vars;
 
-use crate::bridge::ToDB;
 use anyhow::Result;
 use prost::Message;
 use reqwest::Client;
@@ -12,6 +11,7 @@ use tracing::{debug, error, info};
 use tracing_subscriber::{EnvFilter, field::MakeExt};
 
 use crate::{
+    bridge::ToDB,
     db::Db,
     gtfs::{last_modified, load_realtime_gtfs, load_static_gtfs},
     transit_realtime::FeedMessage,
@@ -45,9 +45,9 @@ async fn main() -> Result<()> {
 
     let gtfs = load_static_gtfs("./seq_gtfs.zip".to_owned()).await?;
 
-    let gtfs = gtfs.0.to_db().await;
+    // let gtfs = gtfs.0.to_db().await;
 
-    debug!(gtfs=?gtfs);
+    // debug!(gtfs=?gtfs);
 
     loop {
         if let Err(e) = poll().await {
@@ -76,7 +76,7 @@ async fn poll() -> Result<()> {
             continue;
         };
 
-        // debug!(trip=?trip);
+        debug!(trip=?trip);
     }
 
     info!("Polled");

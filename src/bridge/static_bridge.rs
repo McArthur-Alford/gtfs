@@ -34,7 +34,7 @@ where
         items.chunks(chunk_size).for_each(|chunk| {
             let converted: Vec<_> = chunk
                 .par_iter()
-                .filter_map(|item| item.to_db().ok())
+                .filter_map(|item| item.clone().to_db().ok())
                 .collect();
 
             for item in converted {
